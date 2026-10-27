@@ -68,6 +68,11 @@ jobs:
             CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabihf-
           scripts/config --file $HOME/scarlet-out/.config --set-str LOCALVERSION "-Scarlet-v7.0-beta1"
           scripts/config --file $HOME/scarlet-out/.config --disable LOCALVERSION_AUTO
+          scripts/config --file $HOME/scarlet-out/.config --enable MODULES
+          scripts/config --file $HOME/scarlet-out/.config --enable MODVERSIONS
+          scripts/config --file $HOME/scarlet-out/.config --enable KALLSYMS_ALL
+          scripts/config --file $HOME/scarlet-out/.config --disable MODULE_SIG
+          scripts/config --file $HOME/scarlet-out/.config --disable MODULE_SIG_FORCE
           make O=$HOME/scarlet-out ARCH=arm64 olddefconfig \
             CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabihf-
           grep -E "^CONFIG_LOCALVERSION=|MODVERSIONS|CONFIG_MODULES=|KALLSYMS" $HOME/scarlet-out/.config
