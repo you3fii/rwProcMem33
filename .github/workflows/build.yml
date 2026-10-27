@@ -1,0 +1,55 @@
+name: Build rwProcMem33 (redwood 5.4)
+on: workflow_dispatch
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison flex libssl-dev \
+            gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf
+
+      - name: Clone kernel + module sources
+        run: |
+          git clone --depth=1 -b staging \
+            https://github.com/Atom-X-Devs/scarlet_xiaomi_sm7325
+          git clone https://github.com/abcz316/rwProcMem33
+
+      - name: Neutron clang
+        run: |
+          mkdir -p $HOME/clang
+          curl -sL https://raw.githubusercontent.com/Neutron-Toolchains/antman/main/antman -o $HOME/antman
+          chmod +x $HOME/antman
+          $HOME/antman -S latest
+          $HOME/antman --patch=glibc
+
+      - name: Set 5.4 preset
+        run: |
+          sed -i 's/KERNEL_VERSION(6,6,30)/KERNEL_VERSION(5,4,61)/' \
+            rwProcMem33/rwProcMem33Module/rwProcMem_module/ver_control.h
+
+      - name: Build kernel modules
+        run: |
+          cd scarlet_xiaomi_sm7325
+          export PATH=$HOME/clang/bin:$PATH
+          make O=out ARCH=arm64 vendor/xiaomi-qgki_defconfig \
+            CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabihf-
+          make O=out -j$(nproc) ARCH=arm64 \
+            CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabihf- \
+            CC=clang modules
+
+      - name: Build module
+        run: |
+          export PATH=$HOME/clang/bin:$PATH
+          cd rwProcMem33/rwProcMem33Module/rwProcMem_module
+          make -C $GITHUB_WORKSPACE/scarlet_xiaomi_sm7325/out ARCH=arm64 \
+            CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabihf- \
+            CC=clang M=$PWD modules
+
+      - name: Upload .ko
+        uses: actions/upload-artifact@v4
+        with:
+          name: rwProcMem33-redwood
+          path: rwProcMem33/rwProcMem33Module/rwProcMem_module/*.ko
