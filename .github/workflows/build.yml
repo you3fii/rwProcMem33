@@ -5,54 +5,91 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      - name: Deps
+      - name: Resolve kernel commit
+        id: ks
         run: |
-          sudo apt-get update
-          sudo apt-get install -y bc bison flex libssl-dev \
-            gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf
+          SHA=$(curl -s https://api.github.com/repos/Atom-X-Devs/scarlet_xiaomi_sm7325/commits/staging | python3 -c "import sys,json;print(json.load(sys.stdin)['sha'])")
+          echo "sha=$SHA" >> $GITHUB_OUTPUT
+          echo "kernel commit: $SHA"
 
-      - name: Clone kernel + module sources
+      - name: Cache clang
+        id: clangc
+        uses: actions/cache@v4
+        with:
+          path: ~/clang
+          key: neutron-clang-latest
+
+      - name: Cache kernel out dir
+        id: kernelc
+        uses: actions/cache@v4
+        with:
+          path: ~/scarlet-out
+          key: scarlet-out-${{ steps.ks.outputs.sha }}
+
+      - name: Deps (with hard timeout + retries)
         run: |
-          git clone --depth=1 -b staging \
-            https://github.com/Atom-X-Devs/scarlet_xiaomi_sm7325
+          for i in 1 2 3; do
+            timeout 240 sudo apt-get update && break || sleep 10
+          done
+          for i in 1 2 3; do
+            timeout 300 sudo apt-get install -y --no-install-recommends \
+              bc bison flex libssl-dev python3 \
+              gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf && break || sleep 10
+          done
+          aarch64-linux-gnu-as --version | head -1
+
+      - name: Clone sources
+        run: |
+          git clone https://github.com/Atom-X-Devs/scarlet_xiaomi_sm7325
           git clone https://github.com/abcz316/rwProcMem33
 
-      - name: Patch missing min-tool-version.sh
-        run: |
-          curl -sL https://raw.githubusercontent.com/torvalds/linux/v5.15/scripts/min-tool-version.sh \
-            -o scarlet_xiaomi_sm7325/scripts/min-tool-version.sh
-          chmod +x scarlet_xiaomi_sm7325/scripts/min-tool-version.sh
-
-      - name: Neutron clang
+      - name: Install Neutron clang (skipped on cache hit)
+        if: steps.clangc.outputs.cache-hit != 'true'
         run: |
           mkdir -p $HOME/clang
           curl -sL https://raw.githubusercontent.com/Neutron-Toolchains/antman/main/antman -o $HOME/antman
           chmod +x $HOME/antman
           $HOME/antman -S latest
           $HOME/antman --patch=glibc
+          $HOME/clang/bin/clang --version | head -1
 
       - name: Set 5.4 preset
         run: |
           sed -i 's/KERNEL_VERSION(6,6,30)/KERNEL_VERSION(5,4,61)/' \
             rwProcMem33/rwProcMem33Module/rwProcMem_module/ver_control.h
 
-      - name: Build kernel modules
+      - name: Configure kernel
+        run: |
+          cd scarlet_xiaomi_sm7325
+          curl -sL https://raw.githubusercontent.com/torvalds/linux/v5.15/scripts/min-tool-version.sh -o scripts/min-tool-version.sh
+          chmod +x scripts/min-tool-version.sh
+          export PATH=$HOME/clang/bin:$PATH
+          make O=$HOME/scarlet-out ARCH=arm64 vendor/xiaomi-qgki_defconfig \
+            CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabihf-
+          scripts/config --file $HOME/scarlet-out/.config --set-str LOCALVERSION "-Scarlet-v7.0-beta1"
+          scripts/config --file $HOME/scarlet-out/.config --disable LOCALVERSION_AUTO
+          make O=$HOME/scarlet-out ARCH=arm64 olddefconfig \
+            CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabihf-
+          grep -E "^CONFIG_LOCALVERSION=|MODVERSIONS|CONFIG_MODULES=|KALLSYMS" $HOME/scarlet-out/.config
+
+      - name: Build vmlinux + in-tree modules
         run: |
           cd scarlet_xiaomi_sm7325
           export PATH=$HOME/clang/bin:$PATH
-          make O=out ARCH=arm64 vendor/xiaomi-qgki_defconfig \
-            CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabihf-
-          make O=out -j$(nproc) ARCH=arm64 \
+          make O=$HOME/scarlet-out -j$(nproc) ARCH=arm64 \
             CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabihf- \
-            CC=clang modules
+            CC=clang vmlinux modules
+          ls -la $HOME/scarlet-out/Module.symvers
 
-      - name: Build module
+      - name: Build rwProcMem33 module
         run: |
           export PATH=$HOME/clang/bin:$PATH
           cd rwProcMem33/rwProcMem33Module/rwProcMem_module
-          make -C $GITHUB_WORKSPACE/scarlet_xiaomi_sm7325/out ARCH=arm64 \
+          make -C $GITHUB_WORKSPACE/scarlet_xiaomi_sm7325 O=$HOME/scarlet-out ARCH=arm64 \
             CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabihf- \
             CC=clang M=$PWD modules
+          file rwProcMem_module.ko
+          strings rwProcMem_module.ko | grep vermagic
 
       - name: Upload .ko
         uses: actions/upload-artifact@v4
