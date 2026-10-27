@@ -17,6 +17,12 @@ jobs:
             https://github.com/Atom-X-Devs/scarlet_xiaomi_sm7325
           git clone https://github.com/abcz316/rwProcMem33
 
+      - name: Patch missing min-tool-version.sh
+        run: |
+          curl -sL https://raw.githubusercontent.com/torvalds/linux/v5.15/scripts/min-tool-version.sh \
+            -o scarlet_xiaomi_sm7325/scripts/min-tool-version.sh
+          chmod +x scarlet_xiaomi_sm7325/scripts/min-tool-version.sh
+
       - name: Neutron clang
         run: |
           mkdir -p $HOME/clang
