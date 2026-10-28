@@ -56,10 +56,12 @@ jobs:
           $HOME/clang/bin/clang --version
           test -x $HOME/clang/bin/ld.lld
 
-      - name: Set 5.8 preset (Scarlet backported new maccess API)
+      - name: Set 5.4 preset + adapt to Scarlet backported API
         run: |
-          sed -i 's/KERNEL_VERSION(6,6,30)/KERNEL_VERSION(5,8,0)/' \
+          sed -i 's/KERNEL_VERSION(6,6,30)/KERNEL_VERSION(5,4,61)/' \
             rwProcMem33/rwProcMem33Module/rwProcMem_module/ver_control.h
+          sed -i 's/probe_kernel_read/copy_from_kernel_nofault/g' \
+            rwProcMem33/rwProcMem33Module/rwProcMem_module/linux_kernel_api.h
 
       - name: Configure kernel
         run: |
