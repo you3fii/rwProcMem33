@@ -60,7 +60,7 @@ jobs:
         run: |
           sed -i 's/KERNEL_VERSION(6,6,30)/KERNEL_VERSION(5,4,61)/' \
             rwProcMem33/rwProcMem33Module/rwProcMem_module/ver_control.h
-          sed -i 's/probe_kernel_read/copy_from_kernel_nofault/g' \
+          sed -i 's/\bprobe_kernel_read\b/copy_from_kernel_nofault/g' \
             rwProcMem33/rwProcMem33Module/rwProcMem_module/linux_kernel_api.h
 
       - name: Configure kernel
