@@ -84,6 +84,7 @@ jobs:
         run: |
           cd scarlet_xiaomi_sm7325
           export PATH=$HOME/clang/bin:$PATH
+          export KCFLAGS="-Wno-error=incompatible-pointer-types -Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-error=deprecated-declarations -Wno-error=enum-conversion"
           make O=$HOME/scarlet-out -j$(nproc) ARCH=arm64 \
             CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabihf- \
             CC=clang LD=ld.lld NM=llvm-nm AR=llvm-ar OBJCOPY=llvm-objcopy STRIP=llvm-strip vmlinux modules
@@ -93,6 +94,7 @@ jobs:
         run: |
           export PATH=$HOME/clang/bin:$PATH
           cd rwProcMem33/rwProcMem33Module/rwProcMem_module
+          export KCFLAGS="-Wno-error=incompatible-pointer-types -Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-error=deprecated-declarations -Wno-error=enum-conversion"
           make -C $GITHUB_WORKSPACE/scarlet_xiaomi_sm7325 O=$HOME/scarlet-out ARCH=arm64 \
             CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabihf- \
             CC=clang LD=ld.lld NM=llvm-nm AR=llvm-ar OBJCOPY=llvm-objcopy STRIP=llvm-strip M=$PWD modules
